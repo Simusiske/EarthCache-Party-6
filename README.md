@@ -1,1 +1,0 @@
-# EarthCache-Party-6
