@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Piškvorky</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin-top: 50px;
+        }
+        #board {
+            display: grid;
+            grid-template-columns: repeat(3, 100px);
+            grid-gap: 5px;
+            margin: 0 auto;
+            width: 320px;
+        }
+        .cell {
+            width: 100px;
+            height: 100px;
+            border: 1px solid #000;
+            font-size: 2em;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+        .cell.taken {
+            pointer-events: none;
+        }
+        #message {
+            margin-top: 20px;
+            font-size: 1.2em;
+            color: green;
+        }
+    </style>
+</head>
+<body>
+    <h1>Piškvorky</h1>
+    <div id="board"></div>
+    <div id="message"></div>
+
+    <script>
+        const board = document.getElementById('board');
+        const message = document.getElementById('message');
+        const cells = [];
+        const player = 'X';
+        const ai = 'O';
+
+        // Initialize the board
+        for (let i = 0; i < 9; i++) {
+            const cell = document.createElement('div');
+            cell.classList.add('cell');
+            cell.dataset.index = i;
+            cell.addEventListener('click', playerMove);
+            board.appendChild(cell);
+            cells.push(cell);
+        }
+
+        function playerMove(e) {
+            const cell = e.target;
+            if (!cell.textContent) {
+                cell.textContent = player;
+                cell.classList.add('taken');
+                if (checkWin(player)) {
+                    endGame('Vyhrál jsi! Souřadnice: N 50° 02.401′ E 14° 32.931′');
+                } else if (isDraw()) {
+                    endGame('Remíza!');
+                } else {
+                    aiMove();
+                }
+            }
+        }
+
+        function aiMove() {
+            const bestMove = getBestMove();
+            if (bestMove !== null) {
+                cells[bestMove].textContent = ai;
+                cells[bestMove].classList.add('taken');
+                if (checkWin(ai)) {
+                    endGame('Prohrál jsi! Zkus to znovu.');
+                } else if (isDraw()) {
+                    endGame('Remíza!');
+                }
+            }
+        }
+
+        function getBestMove() {
+            let bestScore = -Infinity;
+            let move = null;
+
+            for (let i = 0; i < cells.length; i++) {
+                if (!cells[i].textContent) {
+                    cells[i].textContent = ai;
+                    const score = minimax(cells, 0, false);
+                    cells[i].textContent = '';
+                    if (score > bestScore) {
+                        bestScore = score;
+                        move = i;
+                    }
+                }
+            }
+
+            return move;
+        }
+
+        function minimax(board, depth, isMaximizing) {
+            if (checkWin(ai)) return 10 - depth;
+            if (checkWin(player)) return depth - 10;
+            if (isDraw()) return 0;
+
+            if (isMaximizing) {
+                let bestScore = -Infinity;
+                for (let i = 0; i < cells.length; i++) {
+                    if (!cells[i].textContent) {
+                        cells[i].textContent = ai;
+                        const score = minimax(cells, depth + 1, false);
+                        cells[i].textContent = '';
+                        bestScore = Math.max(score, bestScore);
+                    }
+                }
+                return bestScore;
+            } else {
+                let bestScore = Infinity;
+                for (let i = 0; i < cells.length; i++) {
+                    if (!cells[i].textContent) {
+                        cells[i].textContent = player;
+                        const score = minimax(cells, depth + 1, true);
+                        cells[i].textContent = '';
+                        bestScore = Math.min(score, bestScore);
+                    }
+                }
+                return bestScore;
+            }
+        }
+
+        function checkWin(currentPlayer) {
+            const winPatterns = [
+                [0, 1, 2], [3, 4, 5], [6, 7, 8], // Rows
+                [0, 3, 6], [1, 4, 7], [2, 5, 8], // Columns
+                [0, 4, 8], [2, 4, 6]             // Diagonals
+            ];
+
+            return winPatterns.some(pattern => {
+                return pattern.every(index => cells[index].textContent === currentPlayer);
+            });
+        }
+
+        function isDraw() {
+            return cells.every(cell => cell.textContent);
+        }
+
+        function endGame(msg) {
+            message.textContent = msg;
+            cells.forEach(cell => cell.removeEventListener('click', playerMove));
+        }
+    </script>
+</body>
+</html>
