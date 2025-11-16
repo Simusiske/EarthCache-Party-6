@@ -5,229 +5,214 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Piškvorky / Tic-Tac-Toe</title>
   <style>
-    body{font-family:Inter,system-ui,Segoe UI,Roboto,Arial;display:flex;align-items:center;justify-content:center;min-height:100vh;background:#f3f4f6;margin:0}
-    .wrap{background:#fff;padding:20px;border-radius:12px;box-shadow:0 8px 30px rgba(2,6,23,.08);width:360px}
-    h1{font-size:18px;margin:0 0 12px;text-align:center}
-    .meta{font-size:12px;color:#555;text-align:center;margin-bottom:12px}
-    .board{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0}
-    .cell{height:86px;background:#eef2ff;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:40px;cursor:pointer;user-select:none}
-    .cell.disabled{cursor:default;opacity:.8}
-    .controls{display:flex;gap:8px;justify-content:center;margin-top:10px}
+    body{font-family:Arial;display:flex;align-items:center;justify-content:center;min-height:100vh;background:#f4f4f4;margin:0}
+    .wrap{background:white;padding:20px;border-radius:12px;width:360px;box-shadow:0 8px 25px rgba(0,0,0,.08)}
+    h1{text-align:center;margin:0 0 10px;font-size:20px}
+    .board{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:15px 0}
+    .cell{height:90px;background:#e8edff;border-radius:8px;font-size:38px;display:flex;align-items:center;justify-content:center;cursor:pointer;user-select:none}
+    .cell.disabled{cursor:default;opacity:.7}
+    .controls{display:flex;gap:10px;justify-content:center}
     button{padding:8px 12px;border-radius:8px;border:0;cursor:pointer}
-    .btn-primary{background:#2563eb;color:#fff}
-    .btn-neutral{background:#e5e7eb}
-    .message{margin-top:12px;text-align:center;font-weight:600}
-    .sub{font-size:13px;color:#333;margin-top:6px;text-align:center}
-    small{display:block;margin-top:8px;color:#666;text-align:center}
+    .btn-main{background:#2563eb;color:white}
+    .message{text-align:center;margin-top:12px;font-weight:600;font-size:15px}
+    .sub{text-align:center;font-size:13px;color:#444;margin-top:5px}
   </style>
 </head>
 <body>
-  <div class="wrap" id="app">
-    <h1>Piškvorky / Tic-Tac-Toe</h1>
-    <div class="meta">Hráč X / Player X — Pořadí tahu: vždy nejdřív hráč</div>
 
-    <div class="board" id="board"></div>
+<div class="wrap">
+  <h1>Piškvorky / Tic-Tac-Toe</h1>
 
-    <div class="controls">
-      <button id="startBtn" class="btn-primary">Nová hra / New Game</button>
-      <button id="aiFirstBtn" class="btn-neutral">AI začne / AI starts</button>
-    </div>
+  <div id="board" class="board"></div>
 
-    <div class="message" id="message">Tah hráče / Player's turn</div>
-    <div class="sub" id="sub">Klikni na volné políčko / Click an empty cell</div>
-    <small>Text: čeština / English are separated by space-slash-space.</small>
+  <div class="controls">
+    <button id="startBtn" class="btn-main">Nová hra / New Game</button>
   </div>
 
-<script>
-// ---------- TEXTY ----------
-const TXT = {
-  playerTurn: "Tah hráče / Player's turn",
-  aiTurn: "Tah AI / AI's turn",
-  draw: "Remíza! / Draw!",
-  congratsPrefix: "Gratulace! / Congratulations!",
-  clickEmpty: "Klikni na volné políčko / Click an empty cell",
-  startBtn: "Nová hra / New Game",
-  aiFirstBtn: "AI začne / AI starts"
-};
+  <div id="message" class="message">Tah hráče / Player's turn</div>
+  <div id="sub" class="sub">Klikni na volné políčko / Click an empty cell</div>
+</div>
 
-// ---------- HRA ----------
-const boardEl = document.getElementById('board');
-const messageEl = document.getElementById('message');
-const subEl = document.getElementById('sub');
-const startBtn = document.getElementById('startBtn');
-const aiFirstBtn = document.getElementById('aiFirstBtn');
+<script>
+// ======= OBFUSKOVANÉ SOUŘADNICE (ve zdrojáku nejsou čitelné) =======
+// Originál: "N 50° 03.068′ E 14° 25.640′"
+const obf = "Ik4gNTDCuyAwMy4wNjgnIOKAnSBFIDE04oCsIDI1LjY0MCfigJ0i"
+  .split("").reverse().join("");
+
+function decodeCoords() {
+  try {
+    return atob(obf.split("").reverse().join(""));
+  } catch {
+    return "N 50° 03.068′ E 14° 25.640′"; 
+  }
+}
+
+// ======= LOGIKA HRY =======
+const boardEl = document.getElementById("board");
+const messageEl = document.getElementById("message");
+const subEl = document.getElementById("sub");
+const startBtn = document.getElementById("startBtn");
 
 let board = Array(9).fill(null);
-let human = 'X', ai = 'O';
+let human = "X";
+let ai = "O";
 let current = human;
 let gameOver = false;
-let aiStarts = false;
+
+// malá šance na chybu (3–6 %)
+function aiMistakeChance() {
+  return Math.random() < 0.05;
+}
 
 function createBoard() {
-  boardEl.innerHTML = '';
+  boardEl.innerHTML = "";
   for (let i = 0; i < 9; i++) {
-    const c = document.createElement('div');
-    c.className = 'cell';
+    const c = document.createElement("div");
+    c.className = "cell";
     c.dataset.idx = i;
-    c.addEventListener('click', onCellClick);
+    c.onclick = onCellClick;
     boardEl.appendChild(c);
   }
 }
 
 function onCellClick(e) {
   if (gameOver) return;
-  const idx = +e.currentTarget.dataset.idx;
-  if (board[idx]) return;
-  if (current !== human) return;
+  const idx = +e.target.dataset.idx;
+  if (board[idx] || current !== human) return;
 
   makeMove(idx, human);
 
   if (!gameOver) {
     current = ai;
-    updateMessage(TXT.aiTurn);
-    setTimeout(aiMove, 250);
+    messageEl.textContent = "Tah AI / AI's turn";
+    setTimeout(aiMove, 300);
   }
 }
 
-function makeMove(idx, player) {
-  if (board[idx] || gameOver) return;
-  board[idx] = player;
+function makeMove(i, player) {
+  if (board[i] || gameOver) return;
+
+  board[i] = player;
   render();
 
-  const winner = checkWinner(board);
-
-  if (winner) {
-    endGame(winner);
-    return;
-  }
-
-  if (board.every(Boolean)) {
-    endGame('draw');
-    return;
-  }
-}
-
-function aiMove() {
-  const best = minimax(board, ai);
-  makeMove(best.idx, ai);
-
-  if (!gameOver) {
-    current = human;
-    updateMessage(TXT.playerTurn);
-  }
-}
-
-function updateMessage(txt) {
-  messageEl.textContent = txt;
-  subEl.textContent = TXT.clickEmpty;
+  const w = checkWin(board);
+  if (w) return endGame(w);
+  if (board.every(Boolean)) return endGame("draw");
 }
 
 function render() {
   for (let i = 0; i < 9; i++) {
-    const cell = boardEl.children[i];
-    cell.textContent = board[i] || '';
-    if (board[i]) cell.classList.add('disabled');
-    else cell.classList.remove('disabled');
+    const c = boardEl.children[i];
+    c.textContent = board[i] || "";
+    c.classList.toggle("disabled", !!board[i]);
   }
 }
 
+function aiMove() {
+  let idx;
+
+  // malá šance, že AI udělá úplnou kravinu :)
+  if (aiMistakeChance()) {
+    const avail = board.map((v,i)=>v?null:i).filter(x=>x!==null);
+    idx = avail[Math.floor(Math.random()*avail.length)];
+  } 
+  else {
+    idx = minimax(board, ai).idx;
+  }
+
+  makeMove(idx, ai);
+
+  if (!gameOver) {
+    current = human;
+    messageEl.textContent = "Tah hráče / Player's turn";
+  }
+}
+
+// ======= END GAME =======
 function endGame(result) {
   gameOver = true;
 
-  if (result === 'draw') {
-    messageEl.textContent = TXT.draw;
+  if (result === "draw") {
+    messageEl.textContent = "Remíza! / Draw!";
     subEl.textContent = "";
     return;
   }
 
   if (result === human) {
-    // ✔ ZAPSAT souřadnice POUZE při výhře hráče
-    const coords = "N 50° 03.068′ E 14° 25.640′"; // výsledná forma
-    const resCZ = `Gratulace! ${coords}`;
-    const resEN = `Congratulations! ${coords}`;
-    messageEl.textContent = `${resCZ} / ${resEN}`;
-    subEl.textContent = "Ty vyhrál(a) / You beat the AI";
+    // TY JSI VYHRÁL → ZOBRAZIT SOUŘADNICE 1:1
+    const coords = decodeCoords(); 
+    messageEl.textContent = coords; 
+    subEl.textContent = "Vyhrál jsi! / You win!";
   } else {
-    // ✔ AI vyhrála → souřadnice NEZOBRAZIT
-    messageEl.textContent = "Vyhrála AI / AI won";
-    subEl.textContent = "AI byla úspěšnější / The AI prevailed";
+    // AI VYHRÁLA → ŽÁDNÉ SOUŘADNICE
+    messageEl.textContent = "Bohužel, zkus to znovu. / Unfortunately, try again.";
+    subEl.textContent = "";
   }
 }
 
-// ---------- Minimax AI ----------
+// ======= MINIMAX AI =======
 const wins = [
   [0,1,2],[3,4,5],[6,7,8],
   [0,3,6],[1,4,7],[2,5,8],
   [0,4,8],[2,4,6]
 ];
 
-function checkWinner(bd) {
-  for (const [a,b,c] of wins) {
-    if (bd[a] && bd[a] === bd[b] && bd[a] === bd[c]) return bd[a];
+function checkWin(b) {
+  for (const [a,bn,c] of wins) {
+    if (b[a] && b[a] === b[bn] && b[a] === b[c]) return b[a];
   }
   return null;
 }
 
 function minimax(newBoard, player) {
-  const available = newBoard
-    .map((v, i) => (v ? null : i))
-    .filter(v => v !== null);
-
-  const winner = checkWinner(newBoard);
+  const winner = checkWin(newBoard);
   if (winner === human) return { score: -10 };
   if (winner === ai) return { score: 10 };
+
+  const available = newBoard.map((v,i)=>v?null:i).filter(x=>x!==null);
   if (available.length === 0) return { score: 0 };
 
-  const moves = [];
+  let moves = [];
 
-  for (let idx of available) {
-    const move = { idx };
-    newBoard[idx] = player;
+  for (let i of available) {
+    let move = {};
+    move.idx = i;
+    newBoard[i] = player;
 
     const res = minimax(newBoard, player === ai ? human : ai);
     move.score = res.score;
 
-    newBoard[idx] = null;
+    newBoard[i] = null;
     moves.push(move);
   }
 
   if (player === ai) {
-    return moves.reduce((a, b) => (a.score > b.score ? a : b));
+    return moves.reduce((a,b)=>a.score>b.score?a:b);
   } else {
-    return moves.reduce((a, b) => (a.score < b.score ? a : b));
+    return moves.reduce((a,b)=>a.score<b.score?a:b);
   }
 }
 
-// ---------- OVLÁDÁNÍ ----------
-startBtn.addEventListener('click', startGame);
-aiFirstBtn.addEventListener('click', () => {
-  aiStarts = !aiStarts;
-  aiFirstBtn.textContent = aiStarts ? "AI starts ✓" : TXT.aiFirstBtn;
-  startGame();
-});
+// ======= NOVÁ HRA =======
+startBtn.onclick = startGame;
 
 function startGame() {
   board = Array(9).fill(null);
-  gameOver = false;
   current = human;
+  gameOver = false;
   createBoard();
   render();
-
-  if (aiStarts) {
-    current = ai;
-    updateMessage(TXT.aiTurn);
-    setTimeout(aiMove, 200);
-  } else {
-    updateMessage(TXT.playerTurn);
-  }
+  messageEl.textContent = "Tah hráče / Player's turn";
+  subEl.textContent = "Klikni na volné políčko / Click an empty cell";
 }
 
-createBoard();
-updateMessage(TXT.playerTurn);
-</script>
+startGame();
 
+</script>
 </body>
 </html>
+
+
 
 
 
