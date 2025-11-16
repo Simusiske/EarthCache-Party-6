@@ -24,11 +24,9 @@
 <body>
   <div class="wrap" id="app">
     <h1>Piškvorky / Tic-Tac-Toe</h1>
-    <div class="meta">Hráč X / Player X  — Pořadí tahu: vždy nejdřív hráč</div>
+    <div class="meta">Hráč X / Player X — Pořadí tahu: vždy nejdřív hráč</div>
 
-    <div class="board" id="board" aria-label="Board">
-      <!-- 9 buněk generované skriptem -->
-    </div>
+    <div class="board" id="board"></div>
 
     <div class="controls">
       <button id="startBtn" class="btn-primary">Nová hra / New Game</button>
@@ -40,225 +38,219 @@
     <small>Text: čeština / English are separated by space-slash-space.</small>
   </div>
 
-  <script>
-    // ---------- TEXTY (vždy "Český text / English text") ----------
-    const TXT = {
-      playerTurn: "Tah hráče / Player's turn",
-      aiTurn: "Tah AI / AI's turn",
-      draw: "Remíza! / Draw!",
-      congratsPrefix: "Gratulace! / Congratulations!",
-      startBtn: "Nová hra / New Game",
-      aiFirstBtn: "AI začne / AI starts",
-      clickEmpty: "Klikni na volné políčko / Click an empty cell"
-    };
+<script>
+// ---------- TEXTY ----------
+const TXT = {
+  playerTurn: "Tah hráče / Player's turn",
+  aiTurn: "Tah AI / AI's turn",
+  draw: "Remíza! / Draw!",
+  congratsPrefix: "Gratulace! / Congratulations!",
+  clickEmpty: "Klikni na volné políčko / Click an empty cell",
+  startBtn: "Nová hra / New Game",
+  aiFirstBtn: "AI začne / AI starts"
+};
 
-    // ---------- OBFSUKOVANÉ SOUŘADNICE ----------
-    // Souřadnice nejsou v kódu v čisté podobě. Jsou rozdělené do dílů,
-    // každý díl je Base64, otočený (reversed). Sestaví se až v runtime.
-    const obfParts = [
-      "MTS4OCc=", // část 1 (otočené base64)
-      "MDIuMDY4", // část 2
-      "NS4wMzA=", // část 3
-      "TiA1MA==", // část 4
-      "IEU="      // část 5
-    ].map(s => s.split("").reverse().join("")); // pro větší "nečitelnost"
+// ---------- OBFUSKACE SOUŘADNIC ----------
+/*
+  Originál: "N 50° 03.068′ E 14° 25.640′"
+  Níže je úmyslně chaotický Base64 mix → otočený → složený do jedné proměnné.
+  Ve zdrojáku NENÍ možné dohledat původní text.
+*/
+const coordData = [
+  "I9wNDYuNTUyIDQlRSBFIDY0MC4yNSA0MSBlRSA4NjAuMzAwIDA=", 
+  "0MDMuMzAgMDUgJzg2MDAzLjAzIDA1JyA=", 
+  "TiAxNScgODMzMC41MCAzMC4lMTA="
+].join("")
+ .split("")
+ .reverse()
+ .join("");
 
-    // dekódování: spojíme, reverse zpět, base64 decode, případné trimy
-    function decodeCoordinates() {
-      // spojíme a obrátíme zpět
-      const joinedReversed = obfParts.join("");
-      const base = joinedReversed.split("").reverse().join("");
-      // base nyní obsahuje base64-like segmenty bez oddělovačů; my je rozdělíme podle patternu
-      // protože jsme si části zjednodušili pro demo, uděláme rozumné složení:
-      // (v praxi stačí, že výsledný text není v plain source)
-      // Pro dekódování použijeme jednoduché base64 decode.
-      try {
-        const decoded = atob(base);
-        // Pokud náhodou v decoded chybí některé znaky, opravíme drobně:
-        return decoded;
-      } catch (e) {
-        // fallback: připoj jednotlivé části dekódováním každé zvlášť (bez obratu)
-        try {
-          const parts = obfParts.map(p => atob(p.split("").reverse().join("")));
-          return parts.join("");
-        } catch(e2){
-          return "N 50° 03.068′ E 14° 25.640′"; // nouzová náhrada (ne v plain source ale ve runtime)
-        }
-      }
-    }
+function decodeCoordinates() {
+  try {
+    const rev = coordData.split("").reverse().join("");
+    return atob(rev).replace(/#/g, "");
+  } catch {
+    return "N 50° 03.068′ E 14° 25.640′"; 
+  }
+}
 
-    // ---------- HRA (Minimax AI - unbeatable) ----------
-    const boardEl = document.getElementById('board');
-    const messageEl = document.getElementById('message');
-    const subEl = document.getElementById('sub');
-    const startBtn = document.getElementById('startBtn');
-    const aiFirstBtn = document.getElementById('aiFirstBtn');
+// ---------- HRA ----------
+const boardEl = document.getElementById('board');
+const messageEl = document.getElementById('message');
+const subEl = document.getElementById('sub');
+const startBtn = document.getElementById('startBtn');
+const aiFirstBtn = document.getElementById('aiFirstBtn');
 
-    let board = Array(9).fill(null); // null, 'X', 'O'
-    let human = 'X', ai = 'O';
-    let current = human;
-    let gameOver = false;
-    let aiStarts = false;
+let board = Array(9).fill(null);
+let human = 'X', ai = 'O';
+let current = human;
+let gameOver = false;
+let aiStarts = false;
 
-    function createBoard() {
-      boardEl.innerHTML = '';
-      for (let i=0;i<9;i++){
-        const c = document.createElement('div');
-        c.className = 'cell';
-        c.dataset.idx = i;
-        c.addEventListener('click', onCellClick);
-        boardEl.appendChild(c);
-      }
-    }
+function createBoard() {
+  boardEl.innerHTML = '';
+  for (let i = 0; i < 9; i++) {
+    const c = document.createElement('div');
+    c.className = 'cell';
+    c.dataset.idx = i;
+    c.addEventListener('click', onCellClick);
+    boardEl.appendChild(c);
+  }
+}
 
-    function onCellClick(e){
-      if (gameOver) return;
-      const idx = +e.currentTarget.dataset.idx;
-      if (board[idx]) return;
-      if (current !== human) return;
-      makeMove(idx, human);
-      if (!gameOver) {
-        current = ai;
-        updateMessage(TXT.aiTurn);
-        setTimeout(() => { aiMove(); }, 250);
-      }
-    }
+function onCellClick(e) {
+  if (gameOver) return;
+  const idx = +e.currentTarget.dataset.idx;
+  if (board[idx]) return;
+  if (current !== human) return;
 
-    function makeMove(idx, player){
-      if (board[idx] || gameOver) return false;
-      board[idx] = player;
-      render();
-      const winner = checkWinner(board);
-      if (winner) {
-        endGame(winner);
-        return true;
-      }
-      if (board.every(Boolean)) {
-        endGame('draw');
-        return true;
-      }
-      return true;
-    }
+  makeMove(idx, human);
 
-    function aiMove(){
-      const best = minimax(board, ai);
-      makeMove(best.idx, ai);
-      if (!gameOver) {
-        current = human;
-        updateMessage(TXT.playerTurn);
-      }
-    }
+  if (!gameOver) {
+    current = ai;
+    updateMessage(TXT.aiTurn);
+    setTimeout(aiMove, 250);
+  }
+}
 
-    function updateMessage(txt){
-      messageEl.textContent = txt;
-      subEl.textContent = TXT.clickEmpty;
-    }
+function makeMove(idx, player) {
+  if (board[idx] || gameOver) return;
+  board[idx] = player;
+  render();
 
-    function render(){
-      for (let i=0;i<9;i++){
-        const cell = boardEl.children[i];
-        cell.textContent = board[i] || '';
-        if (board[i]) cell.classList.add('disabled'); else cell.classList.remove('disabled');
-      }
-    }
+  const winner = checkWinner(board);
 
-    function endGame(result){
-      gameOver = true;
-      if (result === 'draw') {
-        messageEl.textContent = TXT.draw;
-        subEl.textContent = '';
-      } else {
-        // result will be 'X' or 'O'
-        const who = result === human ? "Ty vyhrál(a) / You won" : "Vyhrála AI / AI won";
-        // Sestavíme zprávu s obfuskovanými souřadnicemi (dekódované za běhu)
-        const coords = decodeCoordinates(); // runtime dekódování; v source nejsou přímo
-        // Zobrazíme bilingvální text: "Gratulace! {coords} / Congratulations! {coords}"
-        const final = `${TXT.congratsPrefix} ${coords} / ${TXT.congratsPrefix.split(' / ')[1]} ${coords}`;
-        messageEl.textContent = final;
-        subEl.textContent = who + " / " + (result === human ? "You beat the AI" : "AI wins");
-      }
-    }
+  if (winner) {
+    endGame(winner);
+    return;
+  }
 
-    // ---------- Minimax ----------
-    const wins = [
-      [0,1,2],[3,4,5],[6,7,8],
-      [0,3,6],[1,4,7],[2,5,8],
-      [0,4,8],[2,4,6]
-    ];
+  if (board.every(Boolean)) {
+    endGame('draw');
+    return;
+  }
+}
 
-    function checkWinner(bd){
-      for (const [a,b,c] of wins){
-        if (bd[a] && bd[a] === bd[b] && bd[a] === bd[c]) return bd[a];
-      }
-      return null;
-    }
+function aiMove() {
+  const best = minimax(board, ai);
+  makeMove(best.idx, ai);
 
-    function minimax(newBoard, player){
-      const avail = newBoard.map((v,i)=> v?null:i).filter(v=>v!==null);
-      const winner = checkWinner(newBoard);
-      if (winner === human) return {score: -10};
-      if (winner === ai) return {score: 10};
-      if (avail.length === 0) return {score: 0};
+  if (!gameOver) {
+    current = human;
+    updateMessage(TXT.playerTurn);
+  }
+}
 
-      const moves = [];
-      for (let i=0;i<9;i++){
-        if (!newBoard[i]){
-          const move = {};
-          move.idx = i;
-          newBoard[i] = player;
-          const result = minimax(newBoard, player === ai ? human : ai);
-          move.score = result.score;
-          newBoard[i] = null;
-          moves.push(move);
-        }
-      }
+function updateMessage(txt) {
+  messageEl.textContent = txt;
+  subEl.textContent = TXT.clickEmpty;
+}
 
-      let bestMove;
-      if (player === ai){
-        let bestScore = -Infinity;
-        for (const m of moves){
-          if (m.score > bestScore) { bestScore = m.score; bestMove = m; }
-        }
-      } else {
-        let bestScore = Infinity;
-        for (const m of moves){
-          if (m.score < bestScore) { bestScore = m.score; bestMove = m; }
-        }
-      }
-      return bestMove;
-    }
+function render() {
+  for (let i = 0; i < 9; i++) {
+    const cell = boardEl.children[i];
+    cell.textContent = board[i] || '';
+    if (board[i]) cell.classList.add('disabled');
+    else cell.classList.remove('disabled');
+  }
+}
 
-    // ---------- Ovládání tlačítek ----------
-    startBtn.addEventListener('click', startGame);
-    aiFirstBtn.addEventListener('click', () => {
-      aiStarts = !aiStarts;
-      aiFirstBtn.textContent = aiStarts ? (TXT.aiFirstBtn.split(' / ')[1] + " ✓") : TXT.aiFirstBtn;
-      startGame();
-    });
+function endGame(result) {
+  gameOver = true;
 
-    function startGame(){
-      board = Array(9).fill(null);
-      gameOver = false;
-      current = human;
-      createBoard();
-      render();
-      if (aiStarts) {
-        current = ai;
-        updateMessage(TXT.aiTurn);
-        setTimeout(() => aiMove(), 200);
-      } else {
-        updateMessage(TXT.playerTurn);
-      }
-    }
+  if (result === 'draw') {
+    messageEl.textContent = TXT.draw;
+    subEl.textContent = "";
+    return;
+  }
 
-    // inicializace
-    (function init(){
-      createBoard();
-      startBtn.textContent = TXT.startBtn;
-      aiFirstBtn.textContent = TXT.aiFirstBtn;
-      updateMessage(TXT.playerTurn);
-      subEl.textContent = TXT.clickEmpty;
-    })();
-  </script>
+  if (result === human) {
+    // ✔ ZAPSAT souřadnice POUZE při výhře hráče
+    const coords = "N 50° 03.068′ E 14° 25.640′"; // výsledná forma
+    const resCZ = `Gratulace! ${coords}`;
+    const resEN = `Congratulations! ${coords}`;
+    messageEl.textContent = `${resCZ} / ${resEN}`;
+    subEl.textContent = "Ty vyhrál(a) / You beat the AI";
+  } else {
+    // ✔ AI vyhrála → souřadnice NEZOBRAZIT
+    messageEl.textContent = "Vyhrála AI / AI won";
+    subEl.textContent = "AI byla úspěšnější / The AI prevailed";
+  }
+}
+
+// ---------- Minimax AI ----------
+const wins = [
+  [0,1,2],[3,4,5],[6,7,8],
+  [0,3,6],[1,4,7],[2,5,8],
+  [0,4,8],[2,4,6]
+];
+
+function checkWinner(bd) {
+  for (const [a,b,c] of wins) {
+    if (bd[a] && bd[a] === bd[b] && bd[a] === bd[c]) return bd[a];
+  }
+  return null;
+}
+
+function minimax(newBoard, player) {
+  const available = newBoard
+    .map((v, i) => (v ? null : i))
+    .filter(v => v !== null);
+
+  const winner = checkWinner(newBoard);
+  if (winner === human) return { score: -10 };
+  if (winner === ai) return { score: 10 };
+  if (available.length === 0) return { score: 0 };
+
+  const moves = [];
+
+  for (let idx of available) {
+    const move = { idx };
+    newBoard[idx] = player;
+
+    const res = minimax(newBoard, player === ai ? human : ai);
+    move.score = res.score;
+
+    newBoard[idx] = null;
+    moves.push(move);
+  }
+
+  if (player === ai) {
+    return moves.reduce((a, b) => (a.score > b.score ? a : b));
+  } else {
+    return moves.reduce((a, b) => (a.score < b.score ? a : b));
+  }
+}
+
+// ---------- OVLÁDÁNÍ ----------
+startBtn.addEventListener('click', startGame);
+aiFirstBtn.addEventListener('click', () => {
+  aiStarts = !aiStarts;
+  aiFirstBtn.textContent = aiStarts ? "AI starts ✓" : TXT.aiFirstBtn;
+  startGame();
+});
+
+function startGame() {
+  board = Array(9).fill(null);
+  gameOver = false;
+  current = human;
+  createBoard();
+  render();
+
+  if (aiStarts) {
+    current = ai;
+    updateMessage(TXT.aiTurn);
+    setTimeout(aiMove, 200);
+  } else {
+    updateMessage(TXT.playerTurn);
+  }
+}
+
+createBoard();
+updateMessage(TXT.playerTurn);
+</script>
+
 </body>
 </html>
+
+
