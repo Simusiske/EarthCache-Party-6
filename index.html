@@ -50,30 +50,6 @@ const TXT = {
   aiFirstBtn: "AI začne / AI starts"
 };
 
-// ---------- OBFUSKACE SOUŘADNIC ----------
-/*
-  Originál: "N 50° 03.068′ E 14° 25.640′"
-  Níže je úmyslně chaotický Base64 mix → otočený → složený do jedné proměnné.
-  Ve zdrojáku NENÍ možné dohledat původní text.
-*/
-const coordData = [
-  "I9wNDYuNTUyIDQlRSBFIDY0MC4yNSA0MSBlRSA4NjAuMzAwIDA=", 
-  "0MDMuMzAgMDUgJzg2MDAzLjAzIDA1JyA=", 
-  "TiAxNScgODMzMC41MCAzMC4lMTA="
-].join("")
- .split("")
- .reverse()
- .join("");
-
-function decodeCoordinates() {
-  try {
-    const rev = coordData.split("").reverse().join("");
-    return atob(rev).replace(/#/g, "");
-  } catch {
-    return "N 50° 03.068′ E 14° 25.640′"; 
-  }
-}
-
 // ---------- HRA ----------
 const boardEl = document.getElementById('board');
 const messageEl = document.getElementById('message');
@@ -252,5 +228,6 @@ updateMessage(TXT.playerTurn);
 
 </body>
 </html>
+
 
 
